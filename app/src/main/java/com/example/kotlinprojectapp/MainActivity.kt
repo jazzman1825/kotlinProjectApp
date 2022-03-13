@@ -1,13 +1,10 @@
 package com.example.kotlinprojectapp
 
 import android.content.ContentValues.TAG
-import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,29 +13,22 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.*
-import androidx.compose.runtime.internal.composableLambda
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.*
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import androidx.navigation.NavHost
 import androidx.navigation.NavType
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.example.kotlinprojectapp.ui.theme.KotlinProjectAppTheme
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.callbackFlow
+
+val db = Firebase.firestore
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,9 +49,11 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+
 class ArticleViewModel: ViewModel() {
     var articles = mutableStateOf( listOf<String>())
-
+    var contents = mutableStateOf( listOf<String>())
+    var ids = mutableStateOf( listOf<String>())
 
     init {
         Firebase.firestore
@@ -69,16 +61,36 @@ class ArticleViewModel: ViewModel() {
             .addSnapshotListener{value, error ->
                 if(error != null){
                     // error info here
-
                 } else if(value != null && !value.isEmpty){
-                    val artcls = mutableListOf<String>()
+                    val articlesValue = mutableListOf<String>()
+                    val contentsValue = mutableListOf<String>()
+                    val idsValue = mutableListOf<String>()
+
                     for(d in value.documents){
-                        artcls.add(d.get("title").toString())
+                        articlesValue.add(d.get("title").toString())
+                        contentsValue.add(d.get("contents").toString())
+                        idsValue.add(d.get("id").toString())
                     }
-                    articles.value = artcls
+                    articles.value = articlesValue
+                    contents.value = contentsValue
+                    ids.value = idsValue
                 }
             }
     }
+
+    fun getTitle(id: String?) {
+//        val title = Firebase.firestore.collection("articles").whereEqualTo("id", id).get()
+        val title: String?
+        Firebase.firestore.collection("articles")
+            .whereEqualTo("id", id)
+            .get()
+            .addOnSuccessListener {
+            }
+
+//        return(title)
+    } // unfinished, its purpose was to parse the collection in order to retrieve data for articleViewModel...
+
+
 }
 
 @Composable // Routing
@@ -96,11 +108,11 @@ fun Navigation(){
         composable(route = "article/{articleId}",
             arguments = listOf(
                 navArgument("articleId") {
-                    type = NavType.IntType
+                    type = NavType.StringType
                 }
             ))
         {
-            ArticleView(navControl, it.arguments?.getInt("articleId"))
+            ArticleView(navControl, it.arguments?.getString("articleId"))
         }
 
         composable(route = "writeArticle"){
@@ -144,18 +156,21 @@ fun ArticleFeedView(navControl: NavController) {
     val msgVM: ArticleViewModel = viewModel()
     Scaffold(
         topBar = {
-            TopAppBar { Text(text = "Cool articles app", fontSize = 18.sp) }
+            TopAppBar { Text(text = "Article feed", fontSize = 18.sp) }
         },
         content = {
             Column(
             ) {
-//                Text(text = "Article feed")
-//                Text(
-//                    text = "Article 1",
-//                    modifier = Modifier.clickable { navControl.navigate("article/1") }
-//                )
-                msgVM.articles.value.forEach {
-                    Text(text = it)
+                msgVM.ids.value.forEach {
+                    Text(
+                        text = it,
+                        fontSize = 30.sp,
+
+//                        modifier = Modifier.clickable { navControl.navigate("article/${it}") // BUG HERE / It must route to a specific article but it renders all the list
+//                        }
+
+
+                    )
                 }
 
             }
@@ -174,14 +189,14 @@ fun ArticleFeedView(navControl: NavController) {
 }
 
 @Composable
-fun ArticleView(navControl: NavController, articleId: Int?) {
+fun ArticleView(navControl: NavController, articleContents: String?) {
     Scaffold(
         topBar = {
             TopAppBar { Text(text = "Cool articles app", fontSize = 18.sp) }
         },
         content = {
             Text(
-                text = "this is article with id = $articleId"
+                text = "$articleContents"
             )
         }
     )
@@ -217,7 +232,10 @@ fun WriteArticle(navControl: NavController) {
                     label = {Text(text = "Write your article here!")}
                 )
                 Button(
-                    onClick = {navControl.navigate("feed")},
+                    onClick = {
+                        postArticle(titleState.value, articleState.value)
+                        navControl.navigate("feed")
+                              },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(14.dp)
@@ -259,16 +277,19 @@ fun Password() {
     )
 }
 
+fun postArticle(title: TextFieldValue?, contents: TextFieldValue?) {
 
+    val article = hashMapOf(
+        title to "title",
+        contents to "contents"
+    )
 
-//@Composable
-//fun SigninButton() {
-//    Button(
-//        onClick = {navControl.navigate("feed")},
-//        modifier = Modifier
-//            .fillMaxWidth()
-//    ) {
-//        Text(text = "Log in")
-//    }
-//}             It doesn't work as I want it to so it is all commented
-
+    db.collection("articles")
+        .add(article)
+        .addOnSuccessListener { documentReference ->
+            Log.d(TAG, "DocumentSnapshot added with ID: ${documentReference.id}")
+        }
+        .addOnFailureListener { e ->
+            Log.w(TAG, "Error adding document", e)
+        }
+}
