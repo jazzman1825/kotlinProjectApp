@@ -1,9 +1,12 @@
 package com.example.kotlinprojectapp
 
+import android.content.ContentValues.TAG
 import android.graphics.Color
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,6 +25,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavHost
@@ -30,6 +34,11 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.example.kotlinprojectapp.ui.theme.KotlinProjectAppTheme
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.callbackFlow
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,7 +59,27 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+class ArticleViewModel: ViewModel() {
+    var articles = mutableStateOf( listOf<String>())
 
+
+    init {
+        Firebase.firestore
+            .collection("articles")
+            .addSnapshotListener{value, error ->
+                if(error != null){
+                    // error info here
+
+                } else if(value != null && !value.isEmpty){
+                    val artcls = mutableListOf<String>()
+                    for(d in value.documents){
+                        artcls.add(d.get("title").toString())
+                    }
+                    articles.value = artcls
+                }
+            }
+    }
+}
 
 @Composable // Routing
 fun Navigation(){
@@ -112,6 +141,7 @@ fun LoginView(navControl: NavController)  {
 
 @Composable // Page for viewing the list of articles
 fun ArticleFeedView(navControl: NavController) {
+    val msgVM: ArticleViewModel = viewModel()
     Scaffold(
         topBar = {
             TopAppBar { Text(text = "Cool articles app", fontSize = 18.sp) }
@@ -119,11 +149,14 @@ fun ArticleFeedView(navControl: NavController) {
         content = {
             Column(
             ) {
-                Text(text = "Article feed")
-                Text(
-                    text = "Article 1",
-                    modifier = Modifier.clickable { navControl.navigate("article/1") }
-                )
+//                Text(text = "Article feed")
+//                Text(
+//                    text = "Article 1",
+//                    modifier = Modifier.clickable { navControl.navigate("article/1") }
+//                )
+                msgVM.articles.value.forEach {
+                    Text(text = it)
+                }
 
             }
         },
@@ -225,6 +258,8 @@ fun Password() {
         label = {Text(text = "Password")}
     )
 }
+
+
 
 //@Composable
 //fun SigninButton() {
