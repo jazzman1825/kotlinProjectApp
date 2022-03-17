@@ -53,27 +53,26 @@ class MainActivity : ComponentActivity() {
 class ArticleViewModel: ViewModel() {
     var articles = mutableStateOf( listOf<String>())
     var contents = mutableStateOf( listOf<String>())
-    var ids = mutableStateOf( listOf<String>())
+//    var ids = mutableStateOf( listOf<String>())
 
     init {
         Firebase.firestore
             .collection("articles")
             .addSnapshotListener{value, error ->
                 if(error != null){
-                    // error info here
                 } else if(value != null && !value.isEmpty){
                     val articlesValue = mutableListOf<String>()
                     val contentsValue = mutableListOf<String>()
-                    val idsValue = mutableListOf<String>()
+//                    val idsValue = mutableListOf<String>()
 
                     for(d in value.documents){
                         articlesValue.add(d.get("title").toString())
                         contentsValue.add(d.get("contents").toString())
-                        idsValue.add(d.get("id").toString())
+//                                        idsValue.add(d.get("id").toString())
                     }
                     articles.value = articlesValue
                     contents.value = contentsValue
-                    ids.value = idsValue
+//                    ids.value = idsValue
                 }
             }
     }
@@ -161,13 +160,15 @@ fun ArticleFeedView(navControl: NavController) {
         content = {
             Column(
             ) {
-                msgVM.ids.value.forEach {
+                msgVM.articles.value.forEach {
                     Text(
                         text = it,
                         fontSize = 30.sp,
 
-//                        modifier = Modifier.clickable { navControl.navigate("article/${it}") // BUG HERE / It must route to a specific article but it renders all the list
-//                        }
+                        modifier = Modifier.clickable { navControl.navigate("article/${msgVM.contents.value}")
+                        //                                                               ^   BUG HERE
+                        // It must route to a specific article but it renders all the list
+                        }
 
 
                     )
@@ -205,8 +206,8 @@ fun ArticleView(navControl: NavController, articleContents: String?) {
 
 @Composable
 fun WriteArticle(navControl: NavController) {
-    val titleState =  remember { mutableStateOf(TextFieldValue()) }
-    val articleState =  remember { mutableStateOf(TextFieldValue()) }
+    val titleState =  remember { mutableStateOf("") }
+    val articleState =  remember { mutableStateOf("") }
     Scaffold(
         topBar = {
             TopAppBar { Text(text = "Cool articles app", fontSize = 18.sp) }
@@ -247,6 +248,8 @@ fun WriteArticle(navControl: NavController) {
     )
 }
 
+
+
 @Composable
 fun Title() {
     Text(
@@ -277,11 +280,11 @@ fun Password() {
     )
 }
 
-fun postArticle(title: TextFieldValue?, contents: TextFieldValue?) {
+fun postArticle(title: String, contents: String) {
 
     val article = hashMapOf(
-        title to "title",
-        contents to "contents"
+        "title" to title  ,
+        "contents" to contents
     )
 
     db.collection("articles")
